@@ -22,7 +22,9 @@
 #include <utility>
 #include <vector>
 
-#include "boost/scoped_ptr.hpp"
+#include "boost/shared_ptr.hpp"
+#include <boost/filesystem.hpp>
+
 #include "gflags/gflags.h"
 #include "glog/logging.h"
 
@@ -31,7 +33,7 @@
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/db.hpp"
 // #include "caffe/util/format.hpp"
-// #include "caffe/util/io.hpp"
+#include "caffe/util/io.hpp"
 #include "caffe/util/rng.hpp"
 
 #include "lmdb.hpp"
@@ -46,9 +48,11 @@ DEFINE_bool(shuffle, false,
             "Randomly shuffle the order of images and their labels");
 DEFINE_bool(sync_db, false,
             "Sync the output database with the list if labels and images");
+DEFINE_int32(resize_width, 0, "Width images are resized to");
+DEFINE_int32(resize_height, 0, "Height images are resized to");
 
 /* Read a file if <image path><sep><label> pairs, where sep = SEPARATOR. */
-std::vector<std::pair<std::string, int> > read_images(const std::string& path) {
+std::vector<std::pair<std::string, int> > read_image_labels(const std::string& path) {
     std::ifstream infile(path);
     std::vector<std::pair<std::string, int> > lines;
     std::string line;
@@ -64,16 +68,36 @@ std::vector<std::pair<std::string, int> > read_images(const std::string& path) {
     return lines;
 }
 
-// Create new DB
+// Open an existing database of create a new one.
 shared_ptr<LMDB> open_or_create_db(const std::string& source, bool sync_db) {
     shared_ptr<LMDB> db(new LMDB());
-    if (! sync_db) {
+    if (sync_db) {
+        db->Open(source, LMDB::WRITE);
+    } else {
         db->Open(source, LMDB::NEW);
     }
 
     return db;
 }
 
+shared_ptr<Datum> load_image(const std::string& source, int label, const int resize_width, const int resize_height) {
+    bool status;
+    shared_ptr<Datum> datum(new Datum());
+
+    bool is_color = true;
+    string encode_type = "";
+    status = ReadImageToDatum(source, label, resize_height, resize_width, is_color,
+                              encode_type, datum.get());
+    return datum;
+}
+
+const string& path_join(const std::string &path1, const std::string &path2) {
+    boost::filesystem::path dir  (path1);
+    boost::filesystem::path file (path2);
+    boost::filesystem::path full_path = dir / file;
+
+    return full_path.string();
+}
 // this should take a const char * argv[], but ParseCommandLineFlags wants
 // non-const
 int main(int argc, char * argv[]) {
@@ -97,9 +121,13 @@ int main(int argc, char * argv[]) {
         return 1;
     }
 
+    std::string root_folder(argv[1]);
+    std::string image_labels_file(argv[2]);
+    std::string db_name(argv[3]);
+
     // Read LABEL_FILE (= the file maps image paths to labels).
     std::vector<std::pair<std::string, int> > image_label_lines;
-    image_label_lines = read_images(argv[2]);
+    image_label_lines = read_image_labels(image_labels_file);
 
     if (FLAGS_shuffle) {
         // randomly shuffle data
@@ -107,7 +135,22 @@ int main(int argc, char * argv[]) {
         shuffle(image_label_lines.begin(), image_label_lines.end());
     }
 
-    shared_ptr<LMDB> db = open_or_create_db(argv[3], FLAGS_sync_db);
+    shared_ptr<LMDB> db = open_or_create_db(db_name, FLAGS_sync_db);
+
+    // Read all the image - label pairs from the labels file.
+    int resize_height = std::max<int>(0, FLAGS_resize_height);
+    int resize_width  = std::max<int>(0, FLAGS_resize_width);
+
+
+    for (int line_id = 0; line_id < image_label_lines.size(); ++line_id) {
+        string image_path = image_label_lines[line_id].first;
+        int image_label = image_label_lines[line_id].second;
+        string full_path = path_join(root_folder, image_path);
+
+        std::cout << "Image - label: " << std::to_string(image_label) << " - " << full_path << "\n";
+
+        load_image(full_path, image_label, resize_width, resize_height);
+    }
 
     return 0;
 }

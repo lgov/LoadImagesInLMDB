@@ -19,6 +19,9 @@ find_package(gflags REQUIRED)
 # ---[ LMDB
 find_package(lmdb REQUIRED)
 
+# ---[ OpenCB
+find_package(opencv REQUIRED)
+
 # ---[ Caffe
 list(APPEND LIBRARIES "${CMAKE_SOURCE_DIR}/../caffe/.build_release/lib/libcaffe.a")
 include_directories("${CMAKE_SOURCE_DIR}/../caffe/include/")
@@ -34,6 +37,8 @@ set(PROJECT_SOURCE_DIR ${CMAKE_SOURCE_DIR}/src)
 # The following folder will be included
 include_directories("${PROJECT_SOURCE_DIR}")
 
-add_executable(load_images_in_lmdb ${PROJECT_SOURCE_DIR}/main.cpp ${PROJECT_SOURCE_DIR}/lmdb.cpp)
-target_link_libraries(load_images_in_lmdb gflags glog lmdb)
-target_link_libraries(load_images_in_lmdb ${LIBRARIES})
+add_subdirectory (src)
+
+enable_testing ()
+add_subdirectory (test)
+

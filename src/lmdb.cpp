@@ -13,6 +13,8 @@
  * limitations under the License.
  */
 
+// Based on the db_lmdb code included in the Caffe source distribution.
+
 #include "lmdb.hpp"
 
 #include <sys/stat.h>
@@ -20,17 +22,28 @@
 
 #include <lmdb.h>
 
-void LMDB::Open(const std::string& source, LMDB::Mode mode) {
-    if (int error = mdb_env_create(&mdb_env_)) {
-        mdb_env_close(mdb_env_);
-        throw std::runtime_error("Failure opening LMDB environment");
-    }
+using namespace caffe;  // NOLINT(build/namespaces)
 
+void LMDB::Open(const std::string& source, LMDB::Mode mode) {
+
+    // Create the target folder for a new database
     if (mode == LMDB::NEW) {
         if (mkdir(source.c_str(), 0744)) {
             throw std::runtime_error("mkdir failed");
         }
     }
+
+    if (int error = mdb_env_create(&mdb_env_)) {
+        mdb_env_close(mdb_env_);
+        throw std::runtime_error("Failure creating LMDB environment");
+    }
+
+    if (int error = mdb_env_open(mdb_env_, source.c_str(), 0, 0664)) {
+        mdb_env_close(mdb_env_);
+        throw std::runtime_error("Failure opening LMDB environment");
+    }
+
+    // db connection created
 }
 
 void LMDB::Close() {
@@ -39,4 +52,10 @@ void LMDB::Close() {
         mdb_env_close(mdb_env_);
         mdb_env_ = NULL;
     }
+}
+
+void LMDB::Store_Datum(const shared_ptr<Datum> & Datum) {
+    std::string out;
+//    CHECK(datum.SerializeToString(&out));
+//    txn->Put(key_str, out);
 }

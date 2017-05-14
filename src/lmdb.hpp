@@ -17,8 +17,12 @@
 #define lmdb_h
 
 #include <string>
+#include "boost/shared_ptr.hpp"
+
+using boost::shared_ptr;
 
 #include <lmdb.h>
+#include "caffe/proto/caffe.pb.h"
 
 class LMDB {
 
@@ -29,6 +33,7 @@ public:
     virtual ~LMDB() { Close(); }
     void Open(const std::string& source, Mode mode);
     void Close();
+    void Store_Datum(const shared_ptr<caffe::Datum> & Datum);
 
 private:
     MDB_env* mdb_env_;
