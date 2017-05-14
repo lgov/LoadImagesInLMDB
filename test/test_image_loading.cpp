@@ -16,17 +16,18 @@
 #define BOOST_TEST_MODULE TestImageLoading
 #include <boost/test/unit_test.hpp>
 
-#include <stdio.h>
-
 #define CPU_ONLY
 #include "caffe/proto/caffe.pb.h"
 #include "caffe/util/io.hpp"
 
-#include "lmdb.hpp"
+#include <string>
+#include "boost/shared_ptr.hpp"
+
+using boost::shared_ptr;
 
 static const std::string images_folder = "test/images/";
 
-BOOST_AUTO_TEST_CASE(load_jpg_of_right_size)
+BOOST_AUTO_TEST_CASE(load_jpg_and_resize)
 {
     bool success;
     shared_ptr<caffe::Datum> datum(new caffe::Datum());
