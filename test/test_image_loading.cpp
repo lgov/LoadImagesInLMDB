@@ -13,7 +13,6 @@
  * limitations under the License.
  */
 
-#define BOOST_TEST_MODULE TestImageLoading
 #include <boost/test/unit_test.hpp>
 
 #define CPU_ONLY

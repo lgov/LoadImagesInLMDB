@@ -13,23 +13,5 @@
  * limitations under the License.
  */
 
+#define BOOST_TEST_MODULE TestLoadImagesInLMDB
 #include <boost/test/unit_test.hpp>
-#include "boost/shared_ptr.hpp"
-
-using boost::shared_ptr;
-
-#include "lmdb.hpp"
-
-static const std::string databases_folder = "test/test_working/";
-
-BOOST_AUTO_TEST_CASE(create_database)
-{
-    std::string source = databases_folder + "test_create_database";
-
-    shared_ptr<LMDB> db(new LMDB());
-    db->Open(source, LMDB::NEW);
-
-    BOOST_CHECK( db );
-}
-
-

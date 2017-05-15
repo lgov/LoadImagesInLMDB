@@ -4,7 +4,10 @@ include_directories (${LoadImagesInLMDB_SOURCE_DIR}/src
                      )
 
 add_definitions (-DBOOST_TEST_DYN_LINK)
-add_executable (test_load_images_in_lmdb test_image_loading.cpp)
+add_executable (test_load_images_in_lmdb test_image_loading.cpp
+                                         test_lmdb_database.cpp
+                                         test_main.cpp
+                                         ../src/lmdb.cpp)
 
 target_link_libraries (test_load_images_in_lmdb
                        gflags glog lmdb

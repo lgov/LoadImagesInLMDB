@@ -23,3 +23,6 @@ Makefile
 *.cmake
 CMakeCache.txt
 bin
+
+# test folder
+test/test_working/**
