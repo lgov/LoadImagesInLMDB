@@ -16,15 +16,21 @@
 #include <boost/test/unit_test.hpp>
 #include "boost/shared_ptr.hpp"
 
+#define CPU_ONLY
+#include "caffe/proto/caffe.pb.h"
+#include "caffe/util/io.hpp"
+
 using boost::shared_ptr;
 
 #include "lmdb.hpp"
 
 static const std::string databases_folder = "test/test_working/";
+static const std::string images_folder = "test/images/";
 
 BOOST_AUTO_TEST_CASE(create_database)
 {
     std::string source = databases_folder + "test_create_database";
+    boost::filesystem::remove_all(source);
 
     shared_ptr<LMDB> db(new LMDB());
     db->Open(source, LMDB::NEW);
@@ -32,4 +38,26 @@ BOOST_AUTO_TEST_CASE(create_database)
     BOOST_CHECK( db );
 }
 
+BOOST_AUTO_TEST_CASE(import_image_in_database)
+{
+    bool success;
+    shared_ptr<caffe::Datum> datum(new caffe::Datum());
 
+    std::string source = databases_folder + "test_import_image_in_database";
+    std::string image = images_folder + "640px-Volga_Estate_Anvers.jpg";
+
+    bool is_color = true; std::string encode_type = "";
+    success = ReadImageToDatum(image, 123456, 256, 256, is_color,
+                               encode_type, datum.get());
+
+    shared_ptr<LMDB> db(new LMDB());
+    db->Open(source, LMDB::NEW);
+    BOOST_CHECK( db );
+
+    std::string key = caffe::format_int(1, 8);
+
+    success = db->StoreDatum(key, datum);
+    BOOST_CHECK( success );
+
+    db->Close();
+}

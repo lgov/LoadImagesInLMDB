@@ -22,7 +22,7 @@
 #include <utility>
 #include <vector>
 
-#include "boost/shared_ptr.hpp"
+#include <boost/shared_ptr.hpp>
 #include <boost/filesystem.hpp>
 
 #include "gflags/gflags.h"

@@ -19,10 +19,12 @@
 
 #include <sys/stat.h>
 #include <stdexcept>
+#include <boost/scoped_ptr.hpp>
 
 #include <lmdb.h>
 
 using namespace caffe;  // NOLINT(build/namespaces)
+using boost::scoped_ptr;
 
 void LMDB::Open(const std::string& source, LMDB::Mode mode) {
 
@@ -54,8 +56,66 @@ void LMDB::Close() {
     }
 }
 
-void LMDB::Store_Datum(const shared_ptr<Datum> & Datum) {
+bool LMDB::StoreDatum(const std::string &key, const shared_ptr<Datum> & datum) {
+
     std::string out;
-//    CHECK(datum.SerializeToString(&out));
-//    txn->Put(key_str, out);
+    if (datum->SerializeToString(&out)) {
+
+        // Create transaction, add and commit.
+        scoped_ptr<LMDBTransaction> txn(NewTransaction());
+        txn->Put(key, out);
+        txn->Commit();
+        return true;
+    }
+
+    return false;
 }
+
+LMDBTransaction* LMDB::NewTransaction() {
+    MDB_dbi mdb_dbi;
+    MDB_txn *mdb_txn;
+
+    // Initialize MDB variables
+    if (mdb_txn_begin(mdb_env_, NULL /* no parent */, 0 /* rw */, &mdb_txn)) {
+        return NULL;
+    }
+    if (mdb_dbi_open(mdb_txn, NULL, 0, &mdb_dbi)) {
+        return NULL;
+    }
+
+    return new LMDBTransaction(mdb_txn, mdb_dbi);
+}
+
+/******************************************************************************/
+/* LMDBTransaction                                                            */
+/*                                                                            */
+/******************************************************************************/
+bool LMDBTransaction::Put(const std::string& key, const std::string& value) {
+
+    MDB_val mdb_key, mdb_data;
+
+    mdb_key.mv_size = key.size();
+    mdb_key.mv_data = const_cast<char*>(key.data());
+    mdb_data.mv_size = value.size();
+    mdb_data.mv_data = const_cast<char*>(value.data());
+
+    int put_rc = mdb_put(mdb_txn_, mdb_dbi_, &mdb_key, &mdb_data, 0);
+
+    if (! put_rc) {
+        return true;
+    }
+    return false;
+}
+
+bool LMDBTransaction::Commit() {
+    MDB_env *env = mdb_txn_env(mdb_txn_);
+
+    // Commit the transaction
+    int commit_rc = mdb_txn_commit(mdb_txn_);
+
+    // Cleanup after successful commit
+    mdb_dbi_close(env, mdb_dbi_);
+
+    return true;
+}
+

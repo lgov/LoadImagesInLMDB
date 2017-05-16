@@ -17,12 +17,25 @@
 #define lmdb_h
 
 #include <string>
-#include "boost/shared_ptr.hpp"
+#include <vector>
+#include <boost/shared_ptr.hpp>
 
 using boost::shared_ptr;
 
 #include <lmdb.h>
 #include "caffe/proto/caffe.pb.h"
+
+class LMDBTransaction {
+
+public:
+    LMDBTransaction(MDB_txn* mdb_txn, MDB_dbi mdb_dbi): mdb_txn_(mdb_txn), mdb_dbi_(mdb_dbi) { }
+    bool Put(const std::string& key, const std::string& value);
+    bool Commit();
+
+private:
+    MDB_txn* mdb_txn_;
+    MDB_dbi mdb_dbi_;
+};
 
 class LMDB {
 
@@ -33,7 +46,8 @@ public:
     virtual ~LMDB() { Close(); }
     void Open(const std::string& source, Mode mode);
     void Close();
-    void Store_Datum(const shared_ptr<caffe::Datum> & Datum);
+    bool StoreDatum(const std::string &key, const shared_ptr<caffe::Datum> & Datum);
+    LMDBTransaction* NewTransaction();
 
 private:
     MDB_env* mdb_env_;
