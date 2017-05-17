@@ -91,10 +91,11 @@ shared_ptr<Datum> load_image(const std::string& source, int label, const int res
     return datum;
 }
 
-const string& path_join(const std::string &path1, const std::string &path2) {
-    boost::filesystem::path dir  (path1);
+const std::string& path_join(const std::string &path1, const std::string &path2) {
+
+    boost::filesystem::path full_path (path1);
     boost::filesystem::path file (path2);
-    boost::filesystem::path full_path = dir / file;
+    full_path /= file;
 
     return full_path.string();
 }
@@ -141,15 +142,24 @@ int main(int argc, char * argv[]) {
     int resize_height = std::max<int>(0, FLAGS_resize_height);
     int resize_width  = std::max<int>(0, FLAGS_resize_width);
 
-
     for (int line_id = 0; line_id < image_label_lines.size(); ++line_id) {
-        string image_path = image_label_lines[line_id].first;
+        std::string image_path = image_label_lines[line_id].first;
         int image_label = image_label_lines[line_id].second;
-        string full_path = path_join(root_folder, image_path);
+        std::string full_path = path_join(root_folder, image_path);
 
-        std::cout << "Image - label: " << std::to_string(image_label) << " - " << full_path << "\n";
+//        std::cout << "Image - label: " << std::to_string(image_label) << "\n";
+//        std::cout << "Path: " << full_path << "\n";
 
-        load_image(full_path, image_label, resize_width, resize_height);
+        std::string key = caffe::format_int(line_id, 8);
+        shared_ptr<caffe::Datum> datum = load_image(full_path, image_label, resize_width, resize_height);
+        bool success = db->StoreDatum(key, datum);
+
+        if ((line_id + 1) % 100 == 0) {
+            LOG(INFO) << "Processed " << line_id << " files.";
+        }
+        if ((line_id + 1) % 1000 == 0) {
+            break;
+        }
     }
 
     return 0;
