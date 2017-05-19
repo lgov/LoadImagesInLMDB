@@ -24,6 +24,7 @@
 
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/scoped_ptr.hpp>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -41,6 +42,7 @@
 using namespace caffe;  // NOLINT(build/namespaces)
 using std::pair;
 using boost::shared_ptr;
+using boost::scoped_ptr;
 const char SEPARATOR = ' ';
 
 /* List command-line flags */
@@ -142,6 +144,9 @@ int main(int argc, char * argv[]) {
     int resize_height = std::max<int>(0, FLAGS_resize_height);
     int resize_width  = std::max<int>(0, FLAGS_resize_width);
 
+    LOG(INFO) << "Starting to import " << image_label_lines.size() << " files.";
+
+    scoped_ptr<LMDBTransaction> txn(db->NewTransaction());
     for (int line_id = 0; line_id < image_label_lines.size(); ++line_id) {
         std::string image_path = image_label_lines[line_id].first;
         int image_label = image_label_lines[line_id].second;
@@ -152,12 +157,14 @@ int main(int argc, char * argv[]) {
 
         std::string key = caffe::format_int(line_id, 8);
         shared_ptr<caffe::Datum> datum = load_image(full_path, image_label, resize_width, resize_height);
-        bool success = db->StoreDatum(key, datum);
+        bool success = db->StoreDatum(txn.get(), key, datum);
 
-        if ((line_id + 1) % 100 == 0) {
+        if ((line_id > 0) && (line_id % 1000 == 0)) {
+            txn->Commit();
+            txn.reset(db->NewTransaction());
             LOG(INFO) << "Processed " << line_id << " files.";
         }
-        if ((line_id + 1) % 1000 == 0) {
+        if ((line_id + 1) % 10000 == 0) {
             break;
         }
     }

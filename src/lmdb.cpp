@@ -63,8 +63,19 @@ bool LMDB::StoreDatum(const std::string &key, const shared_ptr<Datum> & datum) {
 
         // Create transaction, add and commit.
         scoped_ptr<LMDBTransaction> txn(NewTransaction());
-        txn->Put(key, out);
+        StoreDatum(txn.get(), key, datum);
         txn->Commit();
+        return true;
+    }
+
+    return false;
+}
+
+bool LMDB::StoreDatum(LMDBTransaction *txn, const std::string &key, const shared_ptr<Datum> & datum) {
+
+    std::string out;
+    if (datum->SerializeToString(&out)) {
+        txn->Put(key, out);
         return true;
     }
 
@@ -84,6 +95,17 @@ LMDBTransaction* LMDB::NewTransaction() {
     }
 
     return new LMDBTransaction(mdb_txn, mdb_dbi);
+}
+
+
+size_t LMDB::NrOfEntries() {
+    MDB_stat stat;
+
+    if (! mdb_env_stat(mdb_env_, &stat)) {
+        return stat.ms_entries;
+    }
+
+    return SIZE_MAX;
 }
 
 /******************************************************************************/
