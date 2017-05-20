@@ -18,11 +18,17 @@ list(APPEND LIBRARIES ${Boost_LIBRARIES})
 # ---[ Google-gflags
 find_package(GFlags REQUIRED)
 
+# ---[ Google-GLog
+find_package(GLOG REQUIRED)
+
 # ---[ LMDB
 find_package(LMDB REQUIRED)
 
 # ---[ OpenCB
 find_package(OpenCV REQUIRED)
+
+# ---[ CUDA
+find_package(CUDA REQUIRED)
 
 # ---[ Caffe
 list(APPEND LIBRARIES "${CMAKE_SOURCE_DIR}/../caffe/.build_release/lib/libcaffe.a")
