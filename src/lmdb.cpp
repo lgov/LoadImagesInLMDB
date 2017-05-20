@@ -56,7 +56,7 @@ void LMDB::Close() {
     }
 }
 
-bool LMDB::StoreDatum(const std::string &key, const shared_ptr<Datum> & datum) {
+bool LMDB::StoreDatum(const std::string &key, const caffe::Datum * datum) {
 
     std::string out;
     if (datum->SerializeToString(&out)) {
@@ -71,7 +71,7 @@ bool LMDB::StoreDatum(const std::string &key, const shared_ptr<Datum> & datum) {
     return false;
 }
 
-bool LMDB::StoreDatum(LMDBTransaction *txn, const std::string &key, const shared_ptr<Datum> & datum) {
+bool LMDB::StoreDatum(LMDBTransaction *txn, const std::string &key, const Datum* datum) {
 
     std::string out;
     if (datum->SerializeToString(&out)) {

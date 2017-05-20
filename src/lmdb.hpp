@@ -46,8 +46,8 @@ public:
     virtual ~LMDB() { Close(); }
     void Open(const std::string& source, Mode mode);
     void Close();
-    bool StoreDatum(LMDBTransaction *txn, const std::string &key, const shared_ptr<caffe::Datum> & Datum);
-    bool StoreDatum(const std::string &key, const shared_ptr<caffe::Datum> & Datum);
+    bool StoreDatum(LMDBTransaction *txn, const std::string &key, const caffe::Datum *  Datum);
+    bool StoreDatum(const std::string &key, const caffe::Datum * Datum);
     LMDBTransaction* NewTransaction();
     size_t NrOfEntries();
 

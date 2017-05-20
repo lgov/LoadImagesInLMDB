@@ -21,10 +21,13 @@
 #include <string>
 #include <utility>
 #include <vector>
+#include <thread>
 
 #include <boost/shared_ptr.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/scoped_ptr.hpp>
+#include <boost/lockfree/spsc_queue.hpp>
+#include <boost/atomic.hpp>
 
 #include "gflags/gflags.h"
 #include "glog/logging.h"
@@ -41,6 +44,7 @@
 
 using namespace caffe;  // NOLINT(build/namespaces)
 using std::pair;
+using std::vector;
 using boost::shared_ptr;
 using boost::scoped_ptr;
 const char SEPARATOR = ' ';
@@ -71,8 +75,8 @@ std::vector<std::pair<std::string, int> > read_image_labels(const std::string& p
 }
 
 // Open an existing database of create a new one.
-shared_ptr<LMDB> open_or_create_db(const std::string& source, bool sync_db) {
-    shared_ptr<LMDB> db(new LMDB());
+LMDB* open_or_create_db(const std::string& source, bool sync_db) {
+    LMDB* db(new LMDB());
     if (sync_db) {
         db->Open(source, LMDB::WRITE);
     } else {
@@ -101,6 +105,94 @@ const std::string& path_join(const std::string &path1, const std::string &path2)
 
     return full_path.string();
 }
+
+/* A lock-free queue, used to pass the read <key> <datum> pairs from the 
+   reader thread to the writer thread */
+boost::lockfree::spsc_queue< pair<std::string, caffe::Datum> > queue(128);
+boost::atomic<bool> done_writing (false);
+
+class ReaderThread {
+public:
+    ReaderThread(vector<pair<std::string, int> > image_label_lines,
+                 std::string root_folder, int resize_width, int resize_height) :
+                    image_label_lines_(image_label_lines),
+                    root_folder_(root_folder), resize_width_(resize_width),
+                    resize_height_(resize_height) { }
+
+    void operator()() {
+        LOG(INFO) << "Starting to import " << image_label_lines_.size() << " files.";
+
+        for (int line_id = 0; line_id < image_label_lines_.size(); ++line_id) {
+            std::string image_path = image_label_lines_[line_id].first;
+            int image_label = image_label_lines_[line_id].second;
+            std::string full_path = path_join(root_folder_, image_path);
+
+            //        std::cout << "Image - label: " << std::to_string(image_label) << "\n";
+            //        std::cout << "Path: " << full_path << "\n";
+
+            std::string key = caffe::format_int(line_id, 8);
+            shared_ptr<caffe::Datum> datum = load_image(full_path, image_label, resize_width_, resize_height_);
+
+            // push key, Datum in the queue
+            while (!queue.push(std::make_pair(key, *datum)))
+                ;
+
+            // DEBUG
+            if (line_id % 100 == 0) {
+                LOG(INFO) << "Processed " << line_id << " files.";
+            }
+
+            if ((line_id + 1) % 10000 == 0) {
+                break;
+            }
+        }
+    }
+private:
+    std::vector<std::pair<std::string, int> > image_label_lines_;
+    std::string root_folder_;
+    int resize_height_;
+    int resize_width_;
+};
+
+class WriterThread {
+public:
+    WriterThread(std::string db_name): db_name_(db_name) { }
+
+    void operator()() {
+        db_ = open_or_create_db(db_name_, FLAGS_sync_db);
+
+        size_t id = 0;
+        scoped_ptr<LMDBTransaction> txn(db_->NewTransaction());
+
+        while (! done_writing) {
+            store_all_on_queue(txn, id);
+        }
+
+        store_all_on_queue(txn, id);
+    }
+
+    void store_all_on_queue(scoped_ptr<LMDBTransaction>& txn, size_t& id) {
+        pair<std::string, caffe::Datum> value;
+        std::string key = "";
+
+        while (queue.pop(value)) {
+            bool success = db_->StoreDatum(txn.get(), key, &value.second);
+
+            if ((id > 0) && (id % 100 == 0)) {
+                txn->Commit();
+                txn.reset(db_->NewTransaction());
+                LOG(INFO) << "Processed " << id << " files.";
+            }
+
+//            LOG(INFO) << " available on queue: " << queue.read_available();
+        }
+    }
+    virtual ~WriterThread() { if (db_) delete db_; db_ = NULL; }
+private:
+    std::string db_name_;
+    LMDB* db_;
+};
+
 // this should take a const char * argv[], but ParseCommandLineFlags wants
 // non-const
 int main(int argc, char * argv[]) {
@@ -129,7 +221,7 @@ int main(int argc, char * argv[]) {
     std::string db_name(argv[3]);
 
     // Read LABEL_FILE (= the file maps image paths to labels).
-    std::vector<std::pair<std::string, int> > image_label_lines;
+    vector<pair<std::string, int> > image_label_lines;
     image_label_lines = read_image_labels(image_labels_file);
 
     if (FLAGS_shuffle) {
@@ -137,37 +229,19 @@ int main(int argc, char * argv[]) {
         LOG(INFO) << "Shuffling data";
         shuffle(image_label_lines.begin(), image_label_lines.end());
     }
-
-    shared_ptr<LMDB> db = open_or_create_db(db_name, FLAGS_sync_db);
-
-    // Read all the image - label pairs from the labels file.
     int resize_height = std::max<int>(0, FLAGS_resize_height);
     int resize_width  = std::max<int>(0, FLAGS_resize_width);
 
-    LOG(INFO) << "Starting to import " << image_label_lines.size() << " files.";
+    ReaderThread rt(image_label_lines, root_folder, resize_width, resize_height);
+    std::thread reader(rt);
+    WriterThread wt(db_name);
+    std::thread writer(wt);
 
-    scoped_ptr<LMDBTransaction> txn(db->NewTransaction());
-    for (int line_id = 0; line_id < image_label_lines.size(); ++line_id) {
-        std::string image_path = image_label_lines[line_id].first;
-        int image_label = image_label_lines[line_id].second;
-        std::string full_path = path_join(root_folder, image_path);
+    // First finish reading all images
+    reader.join();
 
-//        std::cout << "Image - label: " << std::to_string(image_label) << "\n";
-//        std::cout << "Path: " << full_path << "\n";
-
-        std::string key = caffe::format_int(line_id, 8);
-        shared_ptr<caffe::Datum> datum = load_image(full_path, image_label, resize_width, resize_height);
-        bool success = db->StoreDatum(txn.get(), key, datum);
-
-        if ((line_id > 0) && (line_id % 1000 == 0)) {
-            txn->Commit();
-            txn.reset(db->NewTransaction());
-            LOG(INFO) << "Processed " << line_id << " files.";
-        }
-        if ((line_id + 1) % 10000 == 0) {
-            break;
-        }
-    }
+    // Then finish storing them all in the database
+    writer.join();
 
     return 0;
 }

@@ -43,7 +43,7 @@ BOOST_AUTO_TEST_CASE(create_database)
 BOOST_AUTO_TEST_CASE(import_image_in_database)
 {
     bool success;
-    shared_ptr<caffe::Datum> datum(new caffe::Datum());
+    scoped_ptr<caffe::Datum> datum(new caffe::Datum());
 
     std::string db_path = databases_folder + "test_import_image_in_database";
     boost::filesystem::remove_all(db_path);
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(import_image_in_database)
 
     std::string key = caffe::format_int(1, 8);
 
-    success = db->StoreDatum(key, datum);
+    success = db->StoreDatum(key, datum.get());
     BOOST_CHECK( success );
 
     db->Close();
@@ -92,19 +92,19 @@ BOOST_AUTO_TEST_CASE(import_multiple_images_in_database)
     shared_ptr<LMDB> db = open_test_database("test_read_image_in_database");
 
     /* Load the first image */
-    shared_ptr<caffe::Datum> datum(new caffe::Datum());
+    scoped_ptr<caffe::Datum> datum(new caffe::Datum());
     std::string image1 = images_folder + "640px-Volga_Estate_Anvers.jpg";
     success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum.get());
     key = caffe::format_int(1, 8);
-    success = db->StoreDatum(key, datum);
+    success = db->StoreDatum(key, datum.get());
 
     BOOST_CHECK_EQUAL(db->NrOfEntries(), 1);
 
-    shared_ptr<caffe::Datum> datum2(new caffe::Datum());
+    datum.reset(new caffe::Datum());
     std::string image2 = images_folder + "1200px-Phở_bò,_Cầu_Giấy,_Hà_Nội.jpg";
-    success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum2.get());
+    success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum.get());
     key = caffe::format_int(2, 8);
-    success = db->StoreDatum(key, datum2);
+    success = db->StoreDatum(key, datum.get());
 
     BOOST_CHECK_EQUAL(db->NrOfEntries(), 2);
 
@@ -126,20 +126,20 @@ BOOST_AUTO_TEST_CASE(import_multiple_images_in_database_single_transaction)
     scoped_ptr<LMDBTransaction> txn(db->NewTransaction());
 
     /* Load the first image */
-    shared_ptr<caffe::Datum> datum(new caffe::Datum());
+    scoped_ptr<caffe::Datum> datum(new caffe::Datum());
     std::string image1 = images_folder + "640px-Volga_Estate_Anvers.jpg";
     success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum.get());
     key = caffe::format_int(1, 8);
-    success = db->StoreDatum(txn.get(), key, datum);
+    success = db->StoreDatum(txn.get(), key, datum.get());
 
     /* Check that this transaction isn't committed yet. */
     BOOST_CHECK_EQUAL(db->NrOfEntries(), 0);
 
-    shared_ptr<caffe::Datum> datum2(new caffe::Datum());
+    datum.reset(new caffe::Datum());
     std::string image2 = images_folder + "1200px-Phở_bò,_Cầu_Giấy,_Hà_Nội.jpg";
-    success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum2.get());
+    success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum.get());
     key = caffe::format_int(2, 8);
-    success = db->StoreDatum(txn.get(), key, datum2);
+    success = db->StoreDatum(txn.get(), key, datum.get());
 
     /* Commit, so now 2 entries become visible for everyone. */
     txn->Commit();
