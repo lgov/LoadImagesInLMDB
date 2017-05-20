@@ -142,10 +142,11 @@ public:
                 LOG(INFO) << "Processed " << line_id << " files.";
             }
 
-            if ((line_id + 1) % 10000 == 0) {
+            if ((line_id + 1) % 1000 == 0) {
                 break;
             }
         }
+        done_writing = true;
     }
 private:
     std::vector<std::pair<std::string, int> > image_label_lines_;
@@ -165,6 +166,7 @@ public:
         scoped_ptr<LMDBTransaction> txn(db_->NewTransaction());
 
         while (! done_writing) {
+            std::this_thread::yield();
             store_all_on_queue(txn, id);
         }
 
