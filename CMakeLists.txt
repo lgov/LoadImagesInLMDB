@@ -1,7 +1,9 @@
-cmake_minimum_required (VERSION 2.8.8)
+cmake_minimum_required (VERSION 3.1.3)
 project (LoadImagesInLMDB)
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
+
+set (CMAKE_CXX_STANDARD 11)
 
 # ---[ Protobuf
 find_package( Protobuf REQUIRED )
