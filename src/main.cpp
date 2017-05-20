@@ -97,7 +97,7 @@ shared_ptr<Datum> load_image(const std::string& source, int label, const int res
     return datum;
 }
 
-const std::string& path_join(const std::string &path1, const std::string &path2) {
+const std::string path_join(const std::string &path1, const std::string &path2) {
 
     boost::filesystem::path full_path (path1);
     boost::filesystem::path file (path2);
