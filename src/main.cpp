@@ -157,7 +157,7 @@ private:
 
 class WriterThread {
 public:
-    WriterThread(std::string db_name): db_name_(db_name) { }
+    WriterThread(std::string db_name): db_name_(db_name), db_(NULL) { }
 
     void operator()() {
         db_ = open_or_create_db(db_name_, FLAGS_sync_db);
