@@ -14,13 +14,13 @@ include_directories(${Boost_INCLUDE_DIRS})
 list(APPEND LIBRARIES ${Boost_LIBRARIES})
 
 # ---[ Google-gflags
-find_package(gflags REQUIRED)
+find_package(GFlags REQUIRED)
 
 # ---[ LMDB
-find_package(lmdb REQUIRED)
+find_package(LMDB REQUIRED)
 
 # ---[ OpenCB
-find_package(opencv REQUIRED)
+find_package(OpenCV REQUIRED)
 
 # ---[ Caffe
 list(APPEND LIBRARIES "${CMAKE_SOURCE_DIR}/../caffe/.build_release/lib/libcaffe.a")
