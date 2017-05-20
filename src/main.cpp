@@ -138,11 +138,11 @@ public:
                 ;
 
             // DEBUG
-            if (line_id % 100 == 0) {
+            if (line_id % 1000 == 0) {
                 LOG(INFO) << "Processed " << line_id << " files.";
             }
 
-            if ((line_id + 1) % 1000 == 0) {
+            if ((line_id + 1) % 10000 == 0) {
                 break;
             }
         }
@@ -180,7 +180,7 @@ public:
         while (queue.pop(value)) {
             bool success = db_->StoreDatum(txn.get(), key, &value.second);
 
-            if ((id > 0) && (id % 100 == 0)) {
+            if ((id > 0) && (id % 1000 == 0)) {
                 txn->Commit();
                 txn.reset(db_->NewTransaction());
                 LOG(INFO) << "Processed " << id << " files.";
