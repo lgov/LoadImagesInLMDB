@@ -94,10 +94,6 @@ else(MSVC)
      endif(APPLE)
 endif(MSVC)
 
-if(GLOG_FOUND)
-    message(STATUS "glog library found at ${GLOG_LIBRARIES}")
-endif()
-
 # handle the QUIETLY and REQUIRED arguments and set GLOG_FOUND to TRUE if
 # all listed variables are TRUE
 include("${CMAKE_ROOT}/Modules/FindPackageHandleStandardArgs.cmake")
@@ -114,6 +110,10 @@ else(MSVC)
      set(GLOG_INCLUDE_DIRS ${GLOG_INCLUDE_DIR})
      string(REGEX REPLACE "/libglog.so" "" GLOG_LIBRARIES_DIR ${GLOG_LIBRARIES})
 endif(MSVC)
+
+if(GLOG_FOUND)
+     message(STATUS "Found glog    (include: ${GLOG_INCLUDE_DIR}, library: ${GLOG_LIBRARIES})")
+endif()
 
 if(GLOG_FOUND)
       # _GLOG_APPEND_LIBRARIES(GLOG GLOG_LIBRARIES)
