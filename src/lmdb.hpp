@@ -31,6 +31,7 @@ public:
     LMDBTransaction(MDB_txn* mdb_txn, MDB_dbi mdb_dbi): mdb_txn_(mdb_txn), mdb_dbi_(mdb_dbi) { }
     bool Put(const std::string& key, const std::string& value);
     bool Commit();
+    bool CommitAndDoubleMapSize();
 
 private:
     MDB_txn* mdb_txn_;
@@ -46,8 +47,10 @@ public:
     virtual ~LMDB() { Close(); }
     void Open(const std::string& source, Mode mode);
     void Close();
-    bool StoreDatum(LMDBTransaction *txn, const std::string &key, const caffe::Datum *  Datum);
-    bool StoreDatum(const std::string &key, const caffe::Datum * Datum);
+
+    bool StoreString(LMDBTransaction *txn, const std::string &key, const std::string &datum_str);
+    bool StoreDatum(LMDBTransaction *txn, const std::string &key, const caffe::Datum *  datum);
+    bool StoreDatum(const std::string &key, const caffe::Datum * datum);
     LMDBTransaction* NewTransaction();
     size_t NrOfEntries();
 

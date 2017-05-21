@@ -129,8 +129,11 @@ BOOST_AUTO_TEST_CASE(import_multiple_images_in_database_single_transaction)
     scoped_ptr<caffe::Datum> datum(new caffe::Datum());
     std::string image1 = images_folder + "640px-Volga_Estate_Anvers.jpg";
     success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum.get());
+    BOOST_CHECK( success );
+
     key = caffe::format_int(1, 8);
     success = db->StoreDatum(txn.get(), key, datum.get());
+    BOOST_CHECK( success );
 
     /* Check that this transaction isn't committed yet. */
     BOOST_CHECK_EQUAL(db->NrOfEntries(), 0);
@@ -138,8 +141,11 @@ BOOST_AUTO_TEST_CASE(import_multiple_images_in_database_single_transaction)
     datum.reset(new caffe::Datum());
     std::string image2 = images_folder + "1200px-Phở_bò,_Cầu_Giấy,_Hà_Nội.jpg";
     success = ReadImageToDatum(image1, 234567, 256, 256, is_color, encode_type, datum.get());
+    BOOST_CHECK( success );
+
     key = caffe::format_int(2, 8);
     success = db->StoreDatum(txn.get(), key, datum.get());
+    BOOST_CHECK( success );
 
     /* Commit, so now 2 entries become visible for everyone. */
     txn->Commit();

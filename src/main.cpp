@@ -108,7 +108,7 @@ const std::string path_join(const std::string &path1, const std::string &path2) 
 
 /* A lock-free queue, used to pass the read <key> <datum> pairs from the 
    reader thread to the writer thread */
-boost::lockfree::spsc_queue< pair<std::string, caffe::Datum> > queue(128);
+boost::lockfree::spsc_queue< pair<std::string, std::string> > queue(128);
 boost::atomic<bool> done_writing (false);
 
 class ReaderThread {
@@ -130,12 +130,17 @@ public:
             //        std::cout << "Image - label: " << std::to_string(image_label) << "\n";
             //        std::cout << "Path: " << full_path << "\n";
 
-            std::string key = caffe::format_int(line_id, 8);
+            std::string key = caffe::format_int(line_id, 8) + "_" + image_path;
+
+            LOG(ERROR) << "===========" << key;
             shared_ptr<caffe::Datum> datum = load_image(full_path, image_label, resize_width_, resize_height_);
 
-            // push key, Datum in the queue
-            while (!queue.push(std::make_pair(key, *datum)))
-                ;
+            std::string datum_str;
+            if (datum->SerializeToString(&datum_str)) {
+                // push key, Datum in the queue
+                while (!queue.push(std::make_pair(key, datum_str)))
+                    ;
+            }
 
             // DEBUG
             if (line_id % 1000 == 0) {
@@ -167,25 +172,41 @@ public:
 
         while (! done_writing) {
             std::this_thread::yield();
-            store_all_on_queue(txn, id);
+            store_all_on_queue(txn, id, false);
         }
 
-        store_all_on_queue(txn, id);
+        store_all_on_queue(txn, id, true);
     }
 
-    void store_all_on_queue(scoped_ptr<LMDBTransaction>& txn, size_t& id) {
-        pair<std::string, caffe::Datum> value;
-        std::string key = "";
+    void store_all_on_queue(scoped_ptr<LMDBTransaction>& txn, size_t& id, bool last) {
+        pair<std::string, std::string> value;
+
 
         while (queue.pop(value)) {
-            bool success = db_->StoreDatum(txn.get(), key, &value.second);
+            LOG(ERROR) << "++++++++++++" << value.first;
+//            LOG(ERROR) << "++++++++++++" << value.second;
 
+            bool success = db_->StoreString(txn.get(), value.first, value.second);
+            if (! success) {
+                // TODO: handle specific exception.
+                txn->CommitAndDoubleMapSize();
+                txn.reset(db_->NewTransaction());
+                LOG(ERROR) << "Error storing datum in db. Doubling map size!";
+                break;
+
+            }
+            id ++;
             if ((id > 0) && (id % 1000 == 0)) {
                 txn->Commit();
                 txn.reset(db_->NewTransaction());
                 LOG(INFO) << "Processed " << id << " files.";
             }
 
+            // Commit the last batch, if any.
+            if (last && (id % 1000 > 0)) {
+                txn->Commit();
+                LOG(INFO) << "Processed " << id << " files.";
+            }
 //            LOG(INFO) << " available on queue: " << queue.read_available();
         }
     }

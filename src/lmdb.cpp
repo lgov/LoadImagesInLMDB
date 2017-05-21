@@ -23,6 +23,9 @@
 
 #include <lmdb.h>
 
+#include "glog/logging.h"
+
+
 using namespace caffe;  // NOLINT(build/namespaces)
 using boost::scoped_ptr;
 
@@ -58,27 +61,26 @@ void LMDB::Close() {
 
 bool LMDB::StoreDatum(const std::string &key, const caffe::Datum * datum) {
 
-    std::string out;
-    if (datum->SerializeToString(&out)) {
-
-        // Create transaction, add and commit.
-        scoped_ptr<LMDBTransaction> txn(NewTransaction());
-        StoreDatum(txn.get(), key, datum);
-        txn->Commit();
-        return true;
+    // Create transaction, add and commit.
+    scoped_ptr<LMDBTransaction> txn(NewTransaction());
+    if (! StoreDatum(txn.get(), key, datum)) {
+        return false;
     }
-
-    return false;
+    return txn->Commit();
 }
+
+bool LMDB::StoreString(LMDBTransaction *txn, const std::string &key, const std::string &datum_str) {
+
+    return txn->Put(key, datum_str);
+}
+
 
 bool LMDB::StoreDatum(LMDBTransaction *txn, const std::string &key, const Datum* datum) {
 
     std::string out;
     if (datum->SerializeToString(&out)) {
-        txn->Put(key, out);
-        return true;
+        return StoreString(txn, key, out);
     }
-
     return false;
 }
 
@@ -122,9 +124,16 @@ bool LMDBTransaction::Put(const std::string& key, const std::string& value) {
     mdb_data.mv_data = const_cast<char*>(value.data());
 
     int put_rc = mdb_put(mdb_txn_, mdb_dbi_, &mdb_key, &mdb_data, 0);
-
     if (! put_rc) {
         return true;
+    }
+    LOG(ERROR) << "Txn Put failed. Aborting!" << put_rc;
+    if (put_rc == MDB_MAP_FULL) {
+        // Maximum map size exceeded, resize is needed.
+        // We let the caller handle that.
+
+        // TODO: exception
+        return false;
     }
     return false;
 }
@@ -134,10 +143,34 @@ bool LMDBTransaction::Commit() {
 
     // Commit the transaction
     int commit_rc = mdb_txn_commit(mdb_txn_);
-
+    if (! commit_rc) {
+        return true;
+    }
     // Cleanup after successful commit
     mdb_dbi_close(env, mdb_dbi_);
 
     return true;
 }
+
+bool LMDBTransaction::CommitAndDoubleMapSize() {
+    if (! Commit()) {
+        return false;
+    }
+
+    // Transaction is out of the way, now double the map size.
+    struct MDB_envinfo current_info;
+    MDB_env *env = mdb_txn_env(mdb_txn_);
+
+    int rc = mdb_env_info(env, &current_info);
+    if (rc) {
+        return false;
+    }
+    size_t new_size = current_info.me_mapsize * 2;
+    rc = mdb_env_set_mapsize(env, new_size);
+    if (rc) {
+        return false;
+    }
+    return true;
+}
+
 
