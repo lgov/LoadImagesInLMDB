@@ -141,11 +141,6 @@ public:
                     ;
             }
 
-            // DEBUG
-            if (line_id % 1000 == 0) {
-                LOG(INFO) << "Processed " << line_id << " files.";
-            }
-
             if ((line_id + 1) % 10000 == 0) {
                 break;
             }
