@@ -132,7 +132,6 @@ public:
 
             std::string key = caffe::format_int(line_id, 8) + "_" + image_path;
 
-            LOG(ERROR) << "===========" << key;
             shared_ptr<caffe::Datum> datum = load_image(full_path, image_label, resize_width_, resize_height_);
 
             std::string datum_str;
@@ -183,8 +182,6 @@ public:
 
 
         while (queue.pop(value)) {
-            LOG(ERROR) << "++++++++++++" << value.first;
-//            LOG(ERROR) << "++++++++++++" << value.second;
 
             bool success = db_->StoreString(txn.get(), value.first, value.second);
             if (! success) {
