@@ -196,13 +196,13 @@ public:
             if ((id > 0) && (id % 1000 == 0)) {
                 txn->Commit();
                 txn.reset(db_->NewTransaction());
-                LOG(INFO) << "Processed " << id << " files.";
+                LOG(INFO) << "Committing. Processed " << id << " files.";
             }
 
             // Commit the last batch, if any.
             if (last && (id % 1000 > 0)) {
                 txn->Commit();
-                LOG(INFO) << "Processed " << id << " files.";
+                LOG(INFO) << "Committing. Processed " << id << " files (and last).";
             }
 //            LOG(INFO) << " available on queue: " << queue.read_available();
         }
